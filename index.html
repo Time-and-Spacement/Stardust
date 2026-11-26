@@ -896,7 +896,7 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
    return (prev&&prev.size===size&&prev.type===type)||(saved&&saved.size===size&&saved.type===type);
   }).length;
   say('Подготовка файлов к загрузке: '+jobs.length+' шт. · уже готово '+completed);
-  let done=completed;
+  let done=0;
   await mapLimit(jobs,6,async job=>{
    const prev=old.get(job.kind+'|'+job.id);
    let path=null,size=0,type='';
