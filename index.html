@@ -876,8 +876,12 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
   });
   await Promise.all(runners);return results;
  }
+ function assetCheckpointKey(uid){return 'stardust_upload_checkpoint_'+uid;}
+ function readAssetCheckpoint(uid){try{return JSON.parse(localStorage.getItem(assetCheckpointKey(uid))||'{}')||{};}catch(e){return {};}}
+ function writeAssetCheckpoint(uid,checkpoint){try{localStorage.setItem(assetCheckpointKey(uid),JSON.stringify(checkpoint));}catch(e){console.warn('Stardust upload checkpoint',e);}}
  async function gatherAssets(uid,oldManifest=[]){
   const old=new Map(oldManifest.map(x=>[x.kind+'|'+x.id,x]));
+  const checkpoint=readAssetCheckpoint(uid);
   const entries=[];
   const referenced=new Set((data.thoughts||[]).flatMap(t=>(t.files||[]).map(f=>f.id).filter(Boolean)));
   const thoughtRows=await readStore('StardustThoughtMedia','files');
@@ -885,22 +889,34 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
   const jobs=[];
   for(const row of thoughtRows){if(!referenced.has(row.id)||!row.value)continue;jobs.push({kind:'thought',id:row.id,blob:row.value});}
   for(const row of musicRows){if(!row.value)continue;jobs.push({kind:'music',id:row.id,item:row.value,blob:row.value.blob instanceof Blob?row.value.blob:null});}
-  say('Подготовка файлов к загрузке: '+jobs.length+' шт.');
+  const completed=jobs.filter(job=>{
+   if(!job.blob)return true;
+   const key=job.kind+'|'+job.id,prev=old.get(key),saved=checkpoint[key];
+   const size=job.blob.size||0,type=job.blob.type||'application/octet-stream';
+   return (prev&&prev.size===size&&prev.type===type)||(saved&&saved.size===size&&saved.type===type);
+  }).length;
+  say('Подготовка файлов к загрузке: '+jobs.length+' шт. · уже готово '+completed);
+  let done=completed;
   await mapLimit(jobs,6,async job=>{
    const prev=old.get(job.kind+'|'+job.id);
    let path=null,size=0,type='';
    if(job.blob){
     path=uid+'/'+job.kind+'/'+encodeURIComponent(job.id);
     size=job.blob.size||0;type=job.blob.type||'application/octet-stream';
+    const saved=checkpoint[job.kind+'|'+job.id];
     if(!prev||prev.size!==size||prev.type!==type){
-     const {error}=await client.storage.from(BUCKET).upload(path,job.blob,{upsert:true,contentType:type});
-     if(error)throw error;
+     if(!saved||saved.size!==size||saved.type!==type){
+      const {error}=await client.storage.from(BUCKET).upload(path,job.blob,{upsert:true,contentType:type});
+      if(error)throw error;
+      checkpoint[job.kind+'|'+job.id]={size,type};
+      writeAssetCheckpoint(uid,checkpoint);
+     }
     }
    }
    entries.push(job.kind==='thought'
     ?{kind:'thought',id:job.id,path,size,type}
     :{kind:'music',id:job.id,path,size,type,meta:cleanMusic(job.item)});
-  },(done,total)=>say('Загрузка файлов в облако: '+done+' из '+total));
+  },()=>{done++;say('Загрузка файлов в облако: '+done+' из '+jobs.length+' · прогресс сохранён');});
   return entries;
  }
  async function restoreAssets(manifest,uid,reconcile=true){
@@ -938,8 +954,8 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
  function rowPayload(snapshot,manifest){return {...snapshot,__stardustCloudAssets:manifest,__stardustPrefs:localPrefs()};}
  function stripCloudFields(payload){const clean={...(payload||{})};const assets=clean.__stardustCloudAssets||[];const prefs=clean.__stardustPrefs||{};delete clean.__stardustCloudAssets;delete clean.__stardustPrefs;return {data:clean,assets,prefs};}
  async function getCloudRow(){const {data,error}=await client.from(TABLE).select('data,updated_at').eq('user_id',session.user.id).maybeSingle();if(error)throw error;return data;}
- async function saveCloud(snapshot,knownRow=undefined){const old=knownRow===undefined?await getCloudRow():knownRow;let manifest=old?.data?.__stardustCloudAssets||[];manifest=await gatherAssets(session.user.id,manifest);const payload=rowPayload(snapshot,manifest);const signature=stable(payload);if(signature===lastPayloadSignature&&old?.updated_at){lastRemoteAt=Date.parse(old.updated_at)||lastRemoteAt;return;}
-   const {data:row,error}=await client.from(TABLE).upsert({user_id:session.user.id,data:payload},{onConflict:'user_id'}).select('updated_at').single();if(error)throw error;lastRemoteAt=Date.parse(row.updated_at)||Date.now();lastPayloadSignature=signature;
+ async function saveCloud(snapshot,knownRow=undefined){const old=knownRow===undefined?await getCloudRow():knownRow;let manifest=old?.data?.__stardustCloudAssets||[];manifest=await gatherAssets(session.user.id,manifest);const payload=rowPayload(snapshot,manifest);const signature=stable(payload);if(signature===lastPayloadSignature&&old?.updated_at){lastRemoteAt=Date.parse(old.updated_at)||lastRemoteAt;localStorage.removeItem(assetCheckpointKey(session.user.id));return;}
+   const {data:row,error}=await client.from(TABLE).upsert({user_id:session.user.id,data:payload},{onConflict:'user_id'}).select('updated_at').single();if(error)throw error;lastRemoteAt=Date.parse(row.updated_at)||Date.now();lastPayloadSignature=signature;localStorage.removeItem(assetCheckpointKey(session.user.id));
  }
  function refreshViews(){try{window.renderHome?.();window.renderWords?.();window.renderFocusStats?.();window.renderHabits?.();window.renderWishes?.();window.renderThoughts?.();window.renderIdeas?.();window.renderProjects?.();window.renderStats?.();window.renderExtraCal?.();window.renderMusic?.();}catch(e){console.warn('Stardust redraw after cloud sync',e)}}
  async function adoptCloudRow(row){const unpacked=stripCloudFields(row.data||{});suppress=true;try{data=unpacked.data;data.tasks=data.tasks||{};data.words=data.words||[];data.focus=data.focus||[];data.thoughts=data.thoughts||[];data.ideas=data.ideas||[];data.habits=data.habits||[];data.wishes=data.wishes||[];data.words.forEach(w=>{if(typeof w.learned!=='boolean')w.learned=false});localStorage.setItem(DATA_KEY,JSON.stringify(data));applyPrefs(unpacked.prefs);await restoreAssets(unpacked.assets,session.user.id);lastRemoteAt=Date.parse(row.updated_at)||Date.now();lastPayloadSignature=stable(row.data||{});}finally{suppress=false;}refreshViews();}
@@ -976,7 +992,7 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
  const musicHost=$id('musicList');if(musicHost){const observer=new MutationObserver(()=>schedule());observer.observe(musicHost,{childList:true,subtree:false});}
  window.__stardustCloudSync={schedule,now:push};
  window.addEventListener('online',schedule);
- document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')pullIfChanged()});
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(session)schedule();else pullIfChanged();}});
  setInterval(pullIfChanged,5000);
 })();
 </script>
