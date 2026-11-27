@@ -897,15 +897,9 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
   }).length;
   say('Подготовка файлов к загрузке: '+jobs.length+' шт. · уже готово '+completed);
   // Count already uploaded files in the progress display, so a page reload resumes visibly.
-  let done=completed;
-  say('Загрузка файлов в облако: '+done+' из '+jobs.length+' · продолжение сохранённого прогресса');
-  const remainingJobs=jobs.filter(job=>{
-   if(!job.blob)return false;
-   const key=job.kind+'|'+job.id,prev=old.get(key),saved=checkpoint[key];
-   const size=job.blob.size||0,type=job.blob.type||'application/octet-stream';
-   return !((prev&&prev.size===size&&prev.type===type)||(saved&&saved.size===size&&saved.type===type));
-  });
-  await mapLimit(remainingJobs,6,async job=>{
+  let done=0;
+  say('Загрузка файлов в облако: '+completed+' из '+jobs.length+' · продолжение сохранённого прогресса');
+  await mapLimit(jobs,6,async job=>{
    const prev=old.get(job.kind+'|'+job.id);
    let path=null,size=0,type='';
    if(job.blob){
@@ -924,7 +918,7 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
    entries.push(job.kind==='thought'
     ?{kind:'thought',id:job.id,path,size,type}
     :{kind:'music',id:job.id,path,size,type,meta:cleanMusic(job.item)});
-  },()=>{done++;say('Загрузка файлов в облако: '+done+' из '+jobs.length+' · прогресс сохранён');});
+  },()=>{done++;say('Загрузка файлов в облако: '+(completed+done)+' из '+jobs.length+' · прогресс сохранён');});
   return entries;
  }
  async function restoreAssets(manifest,uid,reconcile=true){
