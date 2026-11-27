@@ -653,7 +653,7 @@ const focusHost=$('#dailyFocus');if(focusHost){const observer=new MutationObserv
 <script>
 (()=>{
  const priorShow=showPage;showPage=function(id){document.body.classList.toggle('thoughts-page-active',id==='thoughts');document.querySelector('.ideaDrawerPanel')?.classList.remove('ideaDrawerOpen');document.querySelector('.ideaDrawerToggle')?.classList.remove('drawerActive');return priorShow(id)};
- const st=document.createElement('style');st.textContent='.ideaDrawerToggle{display:none}.thoughts-page-active .ideaDrawerToggle{display:block}';document.head.appendChild(st);
+ const st=document.createElement('style');st.textContent='.ideaDrawerToggle{display:block!important}';document.head.appendChild(st);
 })();
 
 </script>
