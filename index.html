@@ -1046,11 +1046,13 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
  const showError=(msg,source,line)=>{let box=document.getElementById('stardustRuntimeErrors');if(!box){box=document.createElement('div');box.id='stardustRuntimeErrors';box.style.cssText='position:fixed;z-index:99999;left:10px;right:10px;bottom:10px;max-height:40vh;overflow:auto;background:#381c36;color:#fff;border:1px solid #ff9bd6;border-radius:12px;padding:12px;font:13px system-ui;white-space:pre-wrap';document.body.appendChild(box)}box.textContent='Ошибка Stardust — отправь мне этот текст:\n'+msg+'\n'+(source||'')+' '+(line||'');};
  window.addEventListener('error',e=>showError(e.message,e.filename,e.lineno));
  window.addEventListener('unhandledrejection',e=>showError(String(e.reason)));
- document.addEventListener('click',e=>{const b=e.target.closest('.navbtn[data-page]');if(!b)return;const id=b.dataset.page;if(!document.getElementById(id))return;e.preventDefault();e.stopImmediatePropagation();document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));document.querySelectorAll('.navbtn').forEach(n=>n.classList.toggle('active',n.dataset.page===id));},true);
+ document.addEventListener('click',e=>{const b=e.target.closest('.navbtn[data-page]');if(!b)return;const id=b.dataset.page;if(!document.getElementById(id))return;e.preventDefault();e.stopImmediatePropagation();document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));document.body.classList.toggle('thoughts-page-active',id==='thoughts');document.querySelectorAll('.navbtn').forEach(n=>n.classList.toggle('active',n.dataset.page===id));},true);
 })();
 </script>
 <script>
-// Keep the Ideas tab persistent and visible after navigation and layout updates
-(()=>{const ensure=()=>{const b=document.getElementById('ideaDrawerToggle');if(b){b.style.setProperty('display','block','important');b.style.setProperty('visibility','visible','important');b.style.setProperty('opacity',b.classList.contains('drawerActive')?'0.35':'1','important');b.style.setProperty('position','fixed','important');b.style.setProperty('z-index','9998','important');}};document.addEventListener('DOMContentLoaded',ensure);const mo=new MutationObserver(ensure);mo.observe(document.body,{childList:true,subtree:true});setTimeout(ensure,500);setTimeout(ensure,1500);})();
-</script>
+// Show Ideas drawer toggle only on the Thoughts page.
+(()=>{
+ const ensure=()=>{const b=document.getElementById('ideaDrawerToggle');if(b){const visible=!!document.getElementById('thoughts')?.classList.contains('active');b.style.setProperty('display',visible?'block':'none','important');b.style.setProperty('visibility',visible?'visible':'hidden','important');b.style.setProperty('opacity',b.classList.contains('drawerActive')?'0.35':'1','important');b.style.setProperty('position','fixed','important');b.style.setProperty('z-index','9998','important');}};
+ document.addEventListener('DOMContentLoaded',ensure);const mo=new MutationObserver(ensure);mo.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});setTimeout(ensure,500);setTimeout(ensure,1500);
+})();</script>
 </body></html>
