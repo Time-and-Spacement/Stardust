@@ -1049,4 +1049,8 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
  document.addEventListener('click',e=>{const b=e.target.closest('.navbtn[data-page]');if(!b)return;const id=b.dataset.page;if(!document.getElementById(id))return;e.preventDefault();e.stopImmediatePropagation();document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));document.querySelectorAll('.navbtn').forEach(n=>n.classList.toggle('active',n.dataset.page===id));},true);
 })();
 </script>
+<script>
+// Keep the Ideas tab persistent and visible after navigation and layout updates
+(()=>{const ensure=()=>{const b=document.getElementById('ideaDrawerToggle');if(b){b.style.setProperty('display','block','important');b.style.setProperty('visibility','visible','important');b.style.setProperty('opacity',b.classList.contains('drawerActive')?'0.35':'1','important');b.style.setProperty('position','fixed','important');b.style.setProperty('z-index','9998','important');}};document.addEventListener('DOMContentLoaded',ensure);const mo=new MutationObserver(ensure);mo.observe(document.body,{childList:true,subtree:true});setTimeout(ensure,500);setTimeout(ensure,1500);})();
+</script>
 </body></html>
