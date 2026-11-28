@@ -1069,4 +1069,9 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
  document.addEventListener('click',e=>{if(e.target.closest('[data-page="stats"]'))setTimeout(drawActivity,80);});
 })();
 </script>
+
+<script>
+/* Explicitly render statistics when the Stats page is navigated to. */
+(()=>{const nav=document.querySelectorAll('.navbtn[data-page="stats"]');nav.forEach(b=>b.addEventListener('click',()=>{setTimeout(()=>{if(typeof renderStats==='function'){try{renderStats()}catch(e){console.error('renderStats on navigation',e)}}},0)}));})();
+</script>
 </body></html>
