@@ -612,7 +612,7 @@ const focusHost=$('#dailyFocus');if(focusHost){const observer=new MutationObserv
  async function allMedia(){const d=await db(),tx=d.transaction(STORE,'readonly'),store=tx.objectStore(STORE),keys=await txReq(store.getAllKeys()),vals=await txReq(store.getAll());return keys.map((id,i)=>({id:String(id),type:vals[i]?.type||'application/octet-stream',blob:vals[i]})).filter(x=>x.blob)}
  function blob64(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]||'');r.onerror=reject;r.readAsDataURL(blob)})}
  function from64(s,type){const bin=atob(s),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return new Blob([a],{type:type||'application/octet-stream'})}
- async function makeBackup(){const referenced=new Set((data.thoughts||[]).flatMap(t=>(t.files||[]).map(f=>f.id).filter(Boolean)));const media=(await allMedia()).filter(x=>referenced.has(x.id)),packed=[];for(const x of media)packed.push({id:x.id,type:x.type,data:await blob64(x.blob)});return {...data,_stardustMedia:packed,_stardustBackupVersion:2}}
+ async function makeBackup(){const referenced=new Set((data.thoughts||[]).flatMap(t=>(t.files||[]).map(f=>f.id==null?'':String(f.id)).filter(Boolean)));const media=(await allMedia()).filter(x=>referenced.has(x.id)),packed=[];for(const x of media)packed.push({id:x.id,type:x.type,data:await blob64(x.blob)});return {...data,_stardustMedia:packed,_stardustBackupVersion:2}}
  async function putMedia(items){if(!Array.isArray(items)||!items.length)return;const d=await db();await new Promise((resolve,reject)=>{const t=d.transaction(STORE,'readwrite'),s=t.objectStore(STORE);for(const x of items){if(x&&x.id&&x.data)s.put(from64(x.data,x.type),x.id)}t.oncomplete=resolve;t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error)})}
  function download(obj){const blob=new Blob([JSON.stringify(obj)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Stardust_backup_'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
  async function exportNow(){try{const b=await makeBackup();download(b);toast('Резервная копия, включая вложения, скачана.')}catch(e){console.error(e);toast('Не удалось создать копию. Проверь свободное место в браузере.')}}
@@ -929,7 +929,7 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
   const thoughtRows=await readStore('StardustThoughtMedia','files');
   const musicRows=await readStore('StardustMusic','audio');
   const jobs=[];
-  for(const row of thoughtRows){if(!referenced.has(row.id)||!row.value)continue;jobs.push({kind:'thought',id:row.id,blob:row.value});}
+  for(const row of thoughtRows){if(!referenced.has(String(row.id))||!row.value)continue;jobs.push({kind:'thought',id:String(row.id),blob:row.value});}
   for(const row of musicRows){if(!row.value)continue;jobs.push({kind:'music',id:row.id,item:row.value,blob:row.value.blob instanceof Blob?row.value.blob:null});}
   const completed=jobs.filter(job=>{
    if(!job.blob)return true;
