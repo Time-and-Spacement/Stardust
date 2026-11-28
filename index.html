@@ -1092,4 +1092,31 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
 <script>
 (()=>{const st=document.getElementById('sdCloudStatus');if(!st)return;st.style.minHeight='54px';st.style.fontWeight='600';st.style.lineHeight='1.5';const old=st.textContent;const observer=new MutationObserver(()=>{const v=st.textContent||'';if(v.includes('Загрузка файлов в облако:')){st.style.color='var(--text)';st.title='Число загруженных/проверенных вложений в текущем проходе. Это не число всех вложений, ранее сохранённых в облаке.';}else if(v.includes('Синхронизировано')||v.includes('Синхронизация завершена')||v.includes('загружены в облако')){st.style.color='#80d6a5';st.title='Последний запрос сохранения данных успешно завершён.';}else if(v.includes('Ошибка')||v.includes('Не удалось')){st.style.color='#ff9eae';st.title='Синхронизация завершилась ошибкой; локальные данные остаются.'}});observer.observe(st,{childList:true,subtree:true,characterData:true});})();
 </script>
+
+<script>
+/* Stardust navigation rebuild: central delegated navigation, resilient to legacy handlers. */
+(()=>{
+ 'use strict';
+ const valid=new Set(['home','english','focus','habits','shop','thoughts','music','health','calendar','stats','projects','settings']);
+ let current=document.querySelector('.page.active')?.id||'home';
+ function navigate(id){
+  if(!valid.has(id))return;
+  const target=document.getElementById(id);if(!target)return;
+  const order=[...valid],from=order.indexOf(current),to=order.indexOf(id);
+  current=id;
+  document.querySelectorAll('.page').forEach(p=>{p.classList.toggle('active',p.id===id);p.classList.remove('page-arrive-next','page-arrive-prev')});
+  target.classList.add(to>=from?'page-arrive-next':'page-arrive-prev');
+  document.querySelectorAll('.navbtn[data-page]').forEach(b=>{const on=b.dataset.page===id;b.classList.toggle('active',on);b.setAttribute('aria-current',on?'page':'false')});
+  document.body.classList.toggle('thoughts-page-active',id==='thoughts');
+  document.querySelector('.ideaDrawerPanel')?.classList.remove('ideaDrawerOpen');
+  document.querySelector('.ideaDrawerToggle')?.classList.remove('drawerActive');
+  try{if(id==='focus')window.renderFocusStats?.();if(id==='habits')window.renderHabits?.();if(id==='shop')window.renderWishes?.();if(id==='calendar')window.renderExtraCal?.();if(id==='projects')window.renderProjects?.();if(id==='stats')window.renderStats?.();if(id==='music'){window.renderMusic?.();window.updateMusicCount?.();}if(id==='home')window.renderHome?.();}catch(e){console.error('Stardust navigation renderer:',e)}
+  const active=document.querySelector('.navbtn.active');active?.scrollIntoView?.({block:'nearest',inline:'nearest',behavior:'smooth'});
+ }
+ document.addEventListener('click',e=>{const b=e.target.closest('.navbtn[data-page]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();navigate(b.dataset.page)},true);
+ window.stardustNavigate=navigate;
+ // Ensure page visibility state is normalized on load without touching stored data.
+ document.addEventListener('DOMContentLoaded',()=>{if(!document.querySelector('.page.active'))navigate(current)});
+})();
+</script>
 </body></html>
