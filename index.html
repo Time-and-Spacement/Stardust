@@ -1074,4 +1074,18 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
 /* Explicitly render statistics when the Stats page is navigated to. */
 (()=>{const nav=document.querySelectorAll('.navbtn[data-page="stats"]');nav.forEach(b=>b.addEventListener('click',()=>{setTimeout(()=>{if(typeof renderStats==='function'){try{renderStats()}catch(e){console.error('renderStats on navigation',e)}}},0)}));})();
 </script>
+
+<script>
+/* Stardust targeted stability fixes */
+(()=>{
+ const health=document.getElementById('health');
+ if(health){health.addEventListener('click',e=>{const b=e.target.closest('.healthTip');if(!b)return;const key=b.dataset.tool;const tips={rest:['Вечернее замедление','Идеи для мягкого завершения дня.',['Приглуши свет, если хочется.','Подготовь удобное место для отдыха.','Выбери спокойное занятие без обязательств.']],break:['Перерыв без экрана','Небольшая пауза не обязана быть продуктивной.',['Отведи взгляд от экрана.','Смени положение или пройдись, если комфортно.','Побудь несколько минут без устройства.']],body:['Расслабление тела','Делай только то, что приятно и комфортно.',['Устройся удобно.','Мягко пошевели кистями или плечами.','Заметь опору и расслабься, не заставляя себя.']]};const t=tips[key];if(!t)return;const host=health.querySelector('#healthToolDetail');if(host)host.innerHTML='<div class="healthTool"><h4>'+t[0]+'</h4><p>'+t[1]+'</p><ol>'+t[2].map(x=>'<li>'+x+'</li>').join('')+'</ol><button class="btn subtle fit" data-health-tip-close>Закрыть</button></div>'});health.addEventListener('click',e=>{if(e.target.closest('[data-health-tip-close]'))health.querySelector('#healthToolDetail')?.replaceChildren()});}
+ /* Emotion buttons start unselected; saved mood levels/notes remain intact. */
+ const moodForm=document.getElementById('healthMoodForm');if(moodForm){const saveMood=document.getElementById('healthSaveMood');if(saveMood)saveMood.addEventListener('click',()=>{moodForm.querySelectorAll('[data-emotion]').forEach(b=>b.classList.remove('primary'));});}
+ /* Refresh page-owned renderers after navigation, not only after month arrows. */
+ document.addEventListener('click',e=>{const b=e.target.closest('.navbtn[data-page]');if(!b)return;const id=b.dataset.page;setTimeout(()=>{try{if(id==='calendar'&&typeof renderExtraCal==='function')renderExtraCal();if(id==='stats'&&typeof renderStats==='function')renderStats();if(id==='projects'&&typeof renderProjects==='function')renderProjects();if(id==='home'&&typeof renderCalendar==='function')renderCalendar();}catch(err){console.error('Navigation refresh:',err)}},120);});
+ /* Prevent stale calendar content: initialize when the page loads and retry on tab entry. */
+ document.addEventListener('DOMContentLoaded',()=>{try{if(typeof renderExtraCal==='function')renderExtraCal();}catch(e){console.error(e)}});
+})();
+</script>
 </body></html>
