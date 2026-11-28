@@ -1088,4 +1088,8 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
  document.addEventListener('DOMContentLoaded',()=>{try{if(typeof renderExtraCal==='function')renderExtraCal();}catch(e){console.error(e)}});
 })();
 </script>
+
+<script>
+(()=>{const nav=document.querySelectorAll('.navbtn[data-page="health"]');nav.forEach(b=>b.addEventListener('click',()=>setTimeout(()=>{document.querySelectorAll('#healthMoodChoices [data-emotion]').forEach(x=>x.classList.remove('primary'));},50)));})();
+</script>
 </body></html>
