@@ -114,7 +114,7 @@ textarea{resize:vertical}
 </svg></div><div class="starEnd">⭐</div></div><div class="pathLabel"><span>Начало</span><span>Звезда</span></div></div>
 <div class="panel" style="margin-top:18px"><div class="topline"><h2>Задачи</h2><button class="btn primary fit" id="addTaskBtn">＋ Добавить</button></div><div class="muted" id="selectedDayText"></div><div id="tasks" class="taskList"></div><div id="emptyTasks" class="notice">На этот день пока нет задач. Добавь первую!</div></div>
 </div><div class="sidePanels">
-<div class="panel"><div class="calendarHead"><button class="btn subtle" id="prevMonth">‹</button><strong id="monthTitle"></strong><button class="btn subtle" id="nextMonth">›</button></div><table class="calendar" id="calendar"></table></div>
+<div class="panel"><div class="calendarHead"><button class="btn subtle" id="prevMonth">‹</button><strong id="monthTitle"></strong><button class="btn subtle" id="nextMonth">›</button></div><table class="calendar" id="homeCalendar"></table></div>
 <div class="panel"><h2>Баллы</h2><div class="stat"><strong id="totalPoints">0</strong><div class="muted">всего звёздных баллов</div></div><div class="divider"></div><h2>День</h2><div id="dayStats" class="muted">Добавь задачи, чтобы начать.</div></div>
 </div></div>
 </section>
@@ -176,7 +176,7 @@ function carryTask(i){let ts=tasksFor(selectedDay),t=ts[i];if(!t||t.done||t.carr
 function bindTaskSwipe(){let start=null;$$$('.task').forEach(el=>{el.addEventListener('touchstart',e=>{if(e.touches.length===1)start={x:e.touches[0].clientX,y:e.touches[0].clientY,idx:Number(el.querySelector('[data-carry]').dataset.carry)}},{passive:true});el.addEventListener('touchend',e=>{if(!start)return;let dx=e.changedTouches[0].clientX-start.x,dy=e.changedTouches[0].clientY-start.y;if(dx>65&&Math.abs(dx)>Math.abs(dy)*1.3)carryTask(start.idx);start=null},{passive:true})})}
 function toggleTask(i){let ts=tasksFor(selectedDay),t=ts[i];if(!t)return;if(!t.done){t.done=true;data.points=(data.points||0)+1;if(ts.every(x=>x.done)&&!data.bonusDays[selectedDay]){data.points+=ts.length;data.bonusDays[selectedDay]=true;toast(`День завершён! Бонус: +${ts.length} ✦`)}else toast('+1 балл ✦')}else{t.done=false;data.points=Math.max(0,data.points-1);if(data.bonusDays[selectedDay]&&ts.every(x=>x.done)){data.points=Math.max(0,data.points-ts.length);delete data.bonusDays[selectedDay]}toast('Отметка снята')}save();renderHome()}
 function deleteTask(i){let ts=tasksFor(selectedDay);if(ts[i].done)data.points=Math.max(0,data.points-1);ts.splice(i,1);if(!ts.length)delete data.tasks[selectedDay];if(data.bonusDays[selectedDay]){delete data.bonusDays[selectedDay];data.points=Math.max(0,data.points-(ts.length+1))}save();renderHome()}
-function renderCalendar(){let y=calendarDate.getFullYear(),m=calendarDate.getMonth();$('#monthTitle').textContent=monthName(calendarDate);let first=new Date(y,m,1).getDay(),shift=(first+6)%7,days=new Date(y,m+1,0).getDate(),rows=Math.ceil((shift+days)/7);let html='<thead><tr>'+['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(x=>`<th>${x}</th>`).join('')+'</tr></thead><tbody>';for(let r=0;r<rows;r++){html+='<tr>';for(let c=0;c<7;c++){let n=r*7+c-shift+1;if(n<1||n>days)html+='<td></td>';else{let k=dateKey(new Date(y,m,n)),cls=[];if(k===selectedDay)cls.push('selected');if(k===today)cls.push('today');if(tasksFor(k).length)cls.push('hasTasks');html+=`<td><button class="${cls.join(' ')}" data-date="${k}">${n}</button></td>`}}html+='</tr>'}$('#calendar').innerHTML=html;$$$('[data-date]').forEach(b=>b.onclick=()=>{selectedDay=b.dataset.date;renderHome()})}
+function renderCalendar(){let y=calendarDate.getFullYear(),m=calendarDate.getMonth();$('#monthTitle').textContent=monthName(calendarDate);let first=new Date(y,m,1).getDay(),shift=(first+6)%7,days=new Date(y,m+1,0).getDate(),rows=Math.ceil((shift+days)/7);let html='<thead><tr>'+['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(x=>`<th>${x}</th>`).join('')+'</tr></thead><tbody>';for(let r=0;r<rows;r++){html+='<tr>';for(let c=0;c<7;c++){let n=r*7+c-shift+1;if(n<1||n>days)html+='<td></td>';else{let k=dateKey(new Date(y,m,n)),cls=[];if(k===selectedDay)cls.push('selected');if(k===today)cls.push('today');if(tasksFor(k).length)cls.push('hasTasks');html+=`<td><button class="${cls.join(' ')}" data-date="${k}">${n}</button></td>`}}html+='</tr>'}$('#homeCalendar').innerHTML=html;$$$('[data-date]').forEach(b=>b.onclick=()=>{selectedDay=b.dataset.date;renderHome()})}
 function modal(id,open){$(id).classList.toggle('open',open)}
 let lastPage='home';function showPage(id){let target=$('#'+id);if(!target)return;let oldIndex=pageOrder.indexOf(lastPage),newIndex=pageOrder.indexOf(id),direction=newIndex>=oldIndex?'next':'prev';lastPage=id;target.classList.remove('page-arrive-next','page-arrive-prev');target.classList.add('page-arrive-'+direction);$$$('.navbtn').forEach(x=>x.classList.toggle('active',x.dataset.page===id));$$$('.page').forEach(p=>p.classList.toggle('active',p.id===id));let active=$('.navbtn.active');if(active)active.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'});if(id==='english'){wordListCollapsed=true;$('#vocabPanel')?.classList.add('vocabCollapsed');if($('#toggleWordList')){$('#toggleWordList').textContent='Развернуть список слов';$('#toggleWordList').setAttribute('aria-expanded','false')}}if(id==='focus')renderFocusStats();if(id==='habits')renderHabits();if(id==='shop')renderWishes()}$$$('.navbtn').forEach(b=>b.onclick=()=>showPage(b.dataset.page));
 let touchStartX=0,touchStartY=0;const pageOrder=['home','english','focus','habits','shop','thoughts','music','health','calendar','stats','projects','settings'];document.querySelector('main').addEventListener('touchstart',e=>{if(e.touches.length===1){touchStartX=e.touches[0].clientX;touchStartY=e.touches[0].clientY}},{passive:true});document.querySelector('main').addEventListener('touchend',e=>{if(!touchStartX)return;if(e.target.closest('input,textarea,select,button,a,[contenteditable=true],.reader,.task')){touchStartX=0;return;}let dx=e.changedTouches[0].clientX-touchStartX,dy=e.changedTouches[0].clientY-touchStartY;touchStartX=0;if(Math.abs(dx)<75||Math.abs(dx)<Math.abs(dy)*1.25||$('#quizScreen').classList.contains('open')||$('#gameScreen').classList.contains('open'))return;let current=$('.page.active')?.id||'home',i=pageOrder.indexOf(current),next=pageOrder[Math.max(0,Math.min(pageOrder.length-1,i+(dx<0?1:-1)))];if(next!==current)showPage(next)},{passive:true});
@@ -413,7 +413,7 @@ try{renderHome();renderWords();renderFocusStats();renderHabits();renderWishes();
  const searchOrb=document.getElementById('searchOrb');if(searchOrb)searchOrb.style.bottom='78px';
  if(typeof window.stardustSearch==='function'){const prior=window.stardustSearch;window.stardustSearch=function(q){let out=prior(q);let seen=new Set(out.map(x=>x.label+'|'+x.text));function walk(v,path,page){if(v==null)return;if(typeof v==='string'&&v.toLowerCase().includes(q.toLowerCase().trim())&&q.trim()){let txt=v.trim();if(txt.length>240)txt=txt.slice(0,240)+'…';let label=path||'Stardust';if(!seen.has(label+'|'+txt)){seen.add(label+'|'+txt);out.push({label,text:txt,page:page||'home'})}}else if(Array.isArray(v))v.forEach((x,i)=>walk(x,path+' · '+(i+1),page));else if(typeof v==='object'){Object.entries(v).forEach(([k,x])=>walk(x,path+' · '+k,page))}}walk(data,'Данные Stardust','home');return out}}
  // Rings in home calendar: completed/total tasks for each day
- if(typeof renderCalendar==='function'){const oldCal=renderCalendar;renderCalendar=function(){oldCal();document.querySelectorAll('#calendar [data-date]').forEach(b=>{let d=b.dataset.date,arr=tasksFor(d),done=arr.filter(x=>x.done).length;if(arr.length){b.classList.add('dayRing');b.style.setProperty('--progress',(done/arr.length*100)+'%');b.innerHTML=`<span>${done}/${arr.length}</span>`;b.title=`${done} из ${arr.length} задач выполнено`}})}}
+ if(typeof renderCalendar==='function'){const oldCal=renderCalendar;renderCalendar=function(){oldCal();document.querySelectorAll('#homeCalendar [data-date]').forEach(b=>{let d=b.dataset.date,arr=tasksFor(d),done=arr.filter(x=>x.done).length;if(arr.length){b.classList.add('dayRing');b.style.setProperty('--progress',(done/arr.length*100)+'%');b.innerHTML=`<span>${done}/${arr.length}</span>`;b.title=`${done} из ${arr.length} задач выполнено`}})}}
  // Short celebration when the user completes the full day's task set
  let celebrationBusy=false;function celebrate(){
  if(celebrationBusy)return;celebrationBusy=true;
@@ -774,13 +774,13 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
 /* Home calendar: solid circular task-progress slices, stable centered dates */
 (()=>{
  const css=document.createElement('style');css.textContent=`
- #home #calendar button[data-date]{width:35px!important;height:35px!important;min-width:35px!important;aspect-ratio:1/1!important;border:0!important;outline:0!important;border-radius:50%!important;padding:0!important;display:grid!important;place-items:center!important;box-shadow:none!important;position:relative!important;overflow:hidden!important;background:#202744!important;color:#f2efff!important;font-size:12px!important;font-weight:550!important;line-height:1!important;font-variant-numeric:tabular-nums!important;transform:none!important}
- #home #calendar button[data-date] span{display:block!important;position:relative!important;z-index:1!important;line-height:1!important;margin:0!important;padding:0!important}
- #home #calendar button[data-date].today{outline:0!important;border:0!important;filter:brightness(1.08)!important;box-shadow:none!important}
- #home #calendar button[data-date].selected{outline:0!important;border:0!important;filter:brightness(1.12)!important;box-shadow:none!important}
- #home #calendar button[data-date]:hover{filter:brightness(1.16)!important;box-shadow:none!important;outline:0!important}
- #home #calendar td{vertical-align:middle!important}
- @media(max-width:550px){#home #calendar button[data-date]{width:31px!important;height:31px!important;min-width:31px!important;font-size:11px!important}}
+ #home #homeCalendar button[data-date]{width:35px!important;height:35px!important;min-width:35px!important;aspect-ratio:1/1!important;border:0!important;outline:0!important;border-radius:50%!important;padding:0!important;display:grid!important;place-items:center!important;box-shadow:none!important;position:relative!important;overflow:hidden!important;background:#202744!important;color:#f2efff!important;font-size:12px!important;font-weight:550!important;line-height:1!important;font-variant-numeric:tabular-nums!important;transform:none!important}
+ #home #homeCalendar button[data-date] span{display:block!important;position:relative!important;z-index:1!important;line-height:1!important;margin:0!important;padding:0!important}
+ #home #homeCalendar button[data-date].today{outline:0!important;border:0!important;filter:brightness(1.08)!important;box-shadow:none!important}
+ #home #homeCalendar button[data-date].selected{outline:0!important;border:0!important;filter:brightness(1.12)!important;box-shadow:none!important}
+ #home #homeCalendar button[data-date]:hover{filter:brightness(1.16)!important;box-shadow:none!important;outline:0!important}
+ #home #homeCalendar td{vertical-align:middle!important}
+ @media(max-width:550px){#home #homeCalendar button[data-date]{width:31px!important;height:31px!important;min-width:31px!important;font-size:11px!important}}
  /* Subtle cosmic detailing integrated into the interface, not the page background */
  .panel{border-color:#aab8ff20!important;box-shadow:0 12px 40px #0003,inset 0 1px 0 #d9dfff0a,0 0 22px #6e75d00a!important;position:relative}
  .panel h2{ text-shadow:0 0 13px #a99aff18 }
@@ -798,7 +798,7 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
  .path .dot{box-shadow:0 0 7px #b6b2ff88}
  .starEnd{filter:drop-shadow(0 0 8px #ffe59b)}
  `;document.head.appendChild(css);
- function paintHomeCalendar(){document.querySelectorAll('#home #calendar button[data-date]').forEach(b=>{const key=b.dataset.date,arr=tasksFor(key),done=arr.filter(t=>t.done).length,total=arr.length;let stops=[];if(total){const slice=360/total;for(let i=0;i<total;i++){const a=i*slice,z=(i+1)*slice;stops.push(`${i<done?'#c7b7ff':'#263451'} ${a}deg ${z}deg`)} }else stops=['#202744 0deg 360deg'];b.style.background=`conic-gradient(from -90deg,${stops.join(',')})`;b.innerHTML=`<span>${new Date(key+'T12:00:00').getDate()}</span>`;b.title=total?`${done} из ${total} задач выполнено`:'На этот день задач нет';});}
+ function paintHomeCalendar(){document.querySelectorAll('#home #homeCalendar button[data-date]').forEach(b=>{const key=b.dataset.date,arr=tasksFor(key),done=arr.filter(t=>t.done).length,total=arr.length;let stops=[];if(total){const slice=360/total;for(let i=0;i<total;i++){const a=i*slice,z=(i+1)*slice;stops.push(`${i<done?'#c7b7ff':'#263451'} ${a}deg ${z}deg`)} }else stops=['#202744 0deg 360deg'];b.style.background=`conic-gradient(from -90deg,${stops.join(',')})`;b.innerHTML=`<span>${new Date(key+'T12:00:00').getDate()}</span>`;b.title=total?`${done} из ${total} задач выполнено`:'На этот день задач нет';});}
  if(typeof renderCalendar==='function'){const base=renderCalendar;renderCalendar=function(){base();paintHomeCalendar()}}
  try{renderCalendar();paintHomeCalendar()}catch(e){console.error('Home calendar rendering',e)}
 })();
@@ -810,7 +810,7 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
  'use strict';
  const style=document.createElement('style');
  style.textContent=`
-  #home #calendar button[data-date]{
+  #home #homeCalendar button[data-date]{
    box-sizing:border-box!important;width:36px!important;height:36px!important;min-width:36px!important;min-height:36px!important;
    padding:0!important;border:0!important;outline:0!important;border-radius:50%!important;
    display:grid!important;place-items:center!important;position:relative!important;overflow:hidden!important;
@@ -818,11 +818,11 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
    box-shadow:none!important;text-shadow:0 1px 3px #17102c!important;transform:none!important;
    background:#51416f!important;
   }
-  #home #calendar button[data-date] span{position:relative!important;z-index:2!important;display:block!important;margin:0!important;padding:0!important;line-height:1!important}
-  #home #calendar button[data-date].today,#home #calendar button[data-date].selected,
-  #home #calendar button[data-date]:hover,#home #calendar button[data-date]:focus{border:0!important;outline:0!important;box-shadow:none!important}
-  #home #calendar td{vertical-align:middle!important}
-  @media(max-width:550px){#home #calendar button[data-date]{width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;font-size:11px!important}}
+  #home #homeCalendar button[data-date] span{position:relative!important;z-index:2!important;display:block!important;margin:0!important;padding:0!important;line-height:1!important}
+  #home #homeCalendar button[data-date].today,#home #homeCalendar button[data-date].selected,
+  #home #homeCalendar button[data-date]:hover,#home #homeCalendar button[data-date]:focus{border:0!important;outline:0!important;box-shadow:none!important}
+  #home #homeCalendar td{vertical-align:middle!important}
+  @media(max-width:550px){#home #homeCalendar button[data-date]{width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;font-size:11px!important}}
   #statsCards{display:none!important}
   #dailyMiniStats .stat{display:none!important}
   #dailyMiniStats .panel{padding-top:14px!important}
@@ -831,7 +831,7 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
  `;
  document.head.appendChild(style);
  function paint(){
-  const calendar=document.querySelector('#home #calendar');
+  const calendar=document.querySelector('#home #homeCalendar');
   if(!calendar)return;
   calendar.querySelectorAll('button[data-date]').forEach(button=>{
    const date=button.dataset.date;
@@ -859,10 +859,10 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
   window.renderCalendar=function(){previous.apply(this,arguments);paint()};
  }
  // Repaint after task updates and month navigation, without polling or timers.
- const cal=document.querySelector('#home #calendar');
+ const cal=document.querySelector('#home #homeCalendar');
  // Removed recursive MutationObserver: paint() rewrites button contents, which retriggered itself endlessly.
  // Calendar redraws are handled by the renderCalendar wrapper and delegated click listener.
- document.addEventListener('click',e=>{if(e.target.closest('#home #calendar,#home [data-task],#home #prevMonth,#home #nextMonth'))requestAnimationFrame(paint)},true);
+ document.addEventListener('click',e=>{if(e.target.closest('#home #homeCalendar,#home [data-task],#home #prevMonth,#home #nextMonth'))requestAnimationFrame(paint)},true);
  // Keep all daily bar charts, remove only the lifetime-total number tiles.
  function cleanStats(){
   const cards=document.getElementById('statsCards');if(cards)cards.replaceChildren();
