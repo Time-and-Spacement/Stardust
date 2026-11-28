@@ -850,7 +850,7 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
  const status=$id('sdCloudStatus');
  if(!window.supabase?.createClient||!status){if(status)status.textContent='Не удалось загрузить модуль облачной синхронизации. Проверь подключение к интернету.';return;}
  const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
- let session=null, syncing=false, suppress=false, timer=null, pending=false, changeVersion=0, initialSyncPromise=null, lastRemoteAt=0, lastPayloadSignature='', authReady=false, realtimeChannel=null;
+ let session=null, syncing=false, suppress=false, timer=null, pending=false, initialSyncPromise=null, lastRemoteAt=0, lastPayloadSignature='', authReady=false;
  const say=(message,error=false)=>{status.textContent=message;status.style.color=error?'#ff9eae':'var(--muted)'};
  const clone=value=>JSON.parse(JSON.stringify(value??{}));
  const hasContent=d=>!!(d&&((Object.keys(d.tasks||{}).length)||(d.words||[]).length||(d.focus||[]).length||(d.thoughts||[]).length||(d.ideas||[]).length||(d.habits||[]).length||(d.wishes||[]).length||(d.projects||[]).length||(d.points||0)));
@@ -876,12 +876,8 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
   });
   await Promise.all(runners);return results;
  }
- function assetCheckpointKey(uid){return 'stardust_upload_checkpoint_'+uid;}
- function readAssetCheckpoint(uid){try{return JSON.parse(localStorage.getItem(assetCheckpointKey(uid))||'{}')||{};}catch(e){return {};}}
- function writeAssetCheckpoint(uid,checkpoint){try{localStorage.setItem(assetCheckpointKey(uid),JSON.stringify(checkpoint));}catch(e){console.warn('Stardust upload checkpoint',e);}}
  async function gatherAssets(uid,oldManifest=[]){
   const old=new Map(oldManifest.map(x=>[x.kind+'|'+x.id,x]));
-  const checkpoint=readAssetCheckpoint(uid);
   const entries=[];
   const referenced=new Set((data.thoughts||[]).flatMap(t=>(t.files||[]).map(f=>f.id).filter(Boolean)));
   const thoughtRows=await readStore('StardustThoughtMedia','files');
@@ -889,36 +885,22 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
   const jobs=[];
   for(const row of thoughtRows){if(!referenced.has(row.id)||!row.value)continue;jobs.push({kind:'thought',id:row.id,blob:row.value});}
   for(const row of musicRows){if(!row.value)continue;jobs.push({kind:'music',id:row.id,item:row.value,blob:row.value.blob instanceof Blob?row.value.blob:null});}
-  const completed=jobs.filter(job=>{
-   if(!job.blob)return true;
-   const key=job.kind+'|'+job.id,prev=old.get(key),saved=checkpoint[key];
-   const size=job.blob.size||0,type=job.blob.type||'application/octet-stream';
-   return (prev&&prev.size===size&&prev.type===type)||(saved&&saved.size===size&&saved.type===type);
-  }).length;
-  say('Подготовка файлов к загрузке: '+jobs.length+' шт. · уже готово '+completed);
-  // Count already uploaded files in the progress display, so a page reload resumes visibly.
-  let done=0;
-  say('Загрузка файлов в облако: '+completed+' из '+jobs.length+' · продолжение сохранённого прогресса');
-  await mapLimit(jobs,6,async job=>{
+  say('Подготовка файлов к загрузке: '+jobs.length+' шт.');
+  await mapLimit(jobs,4,async job=>{
    const prev=old.get(job.kind+'|'+job.id);
    let path=null,size=0,type='';
    if(job.blob){
     path=uid+'/'+job.kind+'/'+encodeURIComponent(job.id);
     size=job.blob.size||0;type=job.blob.type||'application/octet-stream';
-    const saved=checkpoint[job.kind+'|'+job.id];
     if(!prev||prev.size!==size||prev.type!==type){
-     if(!saved||saved.size!==size||saved.type!==type){
-      const {error}=await client.storage.from(BUCKET).upload(path,job.blob,{upsert:true,contentType:type});
-      if(error)throw error;
-      checkpoint[job.kind+'|'+job.id]={size,type};
-      writeAssetCheckpoint(uid,checkpoint);
-     }
+     const {error}=await client.storage.from(BUCKET).upload(path,job.blob,{upsert:true,contentType:type});
+     if(error)throw error;
     }
    }
    entries.push(job.kind==='thought'
     ?{kind:'thought',id:job.id,path,size,type}
     :{kind:'music',id:job.id,path,size,type,meta:cleanMusic(job.item)});
-  },()=>{done++;say('Загрузка файлов в облако: '+(completed+done)+' из '+jobs.length+' · прогресс сохранён');});
+  },(done,total)=>say('Загрузка файлов в облако: '+done+' из '+total));
   return entries;
  }
  async function restoreAssets(manifest,uid,reconcile=true){
@@ -956,37 +938,30 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
  function rowPayload(snapshot,manifest){return {...snapshot,__stardustCloudAssets:manifest,__stardustPrefs:localPrefs()};}
  function stripCloudFields(payload){const clean={...(payload||{})};const assets=clean.__stardustCloudAssets||[];const prefs=clean.__stardustPrefs||{};delete clean.__stardustCloudAssets;delete clean.__stardustPrefs;return {data:clean,assets,prefs};}
  async function getCloudRow(){const {data,error}=await client.from(TABLE).select('data,updated_at').eq('user_id',session.user.id).maybeSingle();if(error)throw error;return data;}
- async function saveCloud(snapshot,knownRow=undefined){const old=knownRow===undefined?await getCloudRow():knownRow;let manifest=old?.data?.__stardustCloudAssets||[];manifest=await gatherAssets(session.user.id,manifest);const payload=rowPayload(snapshot,manifest);const signature=stable(payload);if(signature===lastPayloadSignature&&old?.updated_at){lastRemoteAt=Date.parse(old.updated_at)||lastRemoteAt;localStorage.removeItem(assetCheckpointKey(session.user.id));return;}
-   const {data:row,error}=await client.from(TABLE).upsert({user_id:session.user.id,data:payload},{onConflict:'user_id'}).select('updated_at').single();if(error)throw error;lastRemoteAt=Date.parse(row.updated_at)||Date.now();lastPayloadSignature=signature;localStorage.removeItem(assetCheckpointKey(session.user.id));
+ async function saveCloud(snapshot){const old=await getCloudRow();let manifest=old?.data?.__stardustCloudAssets||[];manifest=await gatherAssets(session.user.id,manifest);const payload=rowPayload(snapshot,manifest);const signature=stable(payload);if(signature===lastPayloadSignature&&old?.updated_at){lastRemoteAt=Date.parse(old.updated_at)||lastRemoteAt;return;}
+   const {data:row,error}=await client.from(TABLE).upsert({user_id:session.user.id,data:payload},{onConflict:'user_id'}).select('updated_at').single();if(error)throw error;lastRemoteAt=Date.parse(row.updated_at)||Date.now();lastPayloadSignature=signature;
  }
  function refreshViews(){try{window.renderHome?.();window.renderWords?.();window.renderFocusStats?.();window.renderHabits?.();window.renderWishes?.();window.renderThoughts?.();window.renderIdeas?.();window.renderProjects?.();window.renderStats?.();window.renderExtraCal?.();window.renderMusic?.();}catch(e){console.warn('Stardust redraw after cloud sync',e)}}
  async function adoptCloudRow(row){const unpacked=stripCloudFields(row.data||{});suppress=true;try{data=unpacked.data;data.tasks=data.tasks||{};data.words=data.words||[];data.focus=data.focus||[];data.thoughts=data.thoughts||[];data.ideas=data.ideas||[];data.habits=data.habits||[];data.wishes=data.wishes||[];data.words.forEach(w=>{if(typeof w.learned!=='boolean')w.learned=false});localStorage.setItem(DATA_KEY,JSON.stringify(data));applyPrefs(unpacked.prefs);await restoreAssets(unpacked.assets,session.user.id);lastRemoteAt=Date.parse(row.updated_at)||Date.now();lastPayloadSignature=stable(row.data||{});}finally{suppress=false;}refreshViews();}
  async function initialSync(){if(!session)return;if(initialSyncPromise)return initialSyncPromise;initialSyncPromise=(async()=>{syncing=true;say('Подключаю Stardust к облаку…');try{const row=await getCloudRow(),local=clone(data||{});if(!row){await saveCloud(local);say('Аккаунт подключён. Данные и файлы загружены в облако.');return;}
-     const remote=stripCloudFields(row.data||{});if(hasContent(local)&&hasContent(remote.data)){data=mergeData(local,remote.data);suppress=true;localStorage.setItem(DATA_KEY,JSON.stringify(data));suppress=false;await restoreAssets(remote.assets,session.user.id,false);lastRemoteAt=Date.parse(row.updated_at)||0;lastPayloadSignature='';await saveCloud(clone(data),row);refreshViews();say('Синхронизация завершена. Локальные и облачные данные объединены.');}
+     const remote=stripCloudFields(row.data||{});if(hasContent(local)&&hasContent(remote.data)){data=mergeData(local,remote.data);suppress=true;localStorage.setItem(DATA_KEY,JSON.stringify(data));suppress=false;await restoreAssets(remote.assets,session.user.id,false);lastRemoteAt=Date.parse(row.updated_at)||0;lastPayloadSignature='';await saveCloud(clone(data));refreshViews();say('Синхронизация завершена. Локальные и облачные данные объединены.');}
      else if(hasContent(local)&&!hasContent(remote.data)){await saveCloud(local);say('Локальные данные загружены в облако.');}
      else{await adoptCloudRow(row);say('Данные и вложения загружены из облака.');}
    }catch(e){console.error('Stardust initial sync',e);say('Не удалось синхронизировать: '+(e.message||'проверь таблицу, Storage и политики доступа.'),true);}finally{syncing=false;initialSyncPromise=null;}})();return initialSyncPromise;}
- async function push(silent=true){if(!session||syncing||suppress)return;syncing=true;let version=changeVersion,failed=false;try{const row=await getCloudRow();if(row){const remoteTime=Date.parse(row.updated_at)||0;if(remoteTime>lastRemoteAt+500){const remote=stripCloudFields(row.data||{});await restoreAssets(remote.assets,session.user.id,false);if(hasContent(remote.data))data=mergeData(data,remote.data);lastRemoteAt=remoteTime;}}
-     version=changeVersion;await saveCloud(clone(data),row);if(changeVersion===version)pending=false;suppress=true;localStorage.setItem(DATA_KEY,JSON.stringify(data));suppress=false;refreshViews();if(!silent)say('Синхронизировано · '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}));
-   }catch(e){failed=true;pending=true;console.error('Stardust cloud push',e);if(!silent)say('Ошибка синхронизации: '+(e.message||'проверь настройки Supabase Storage.'),true);}finally{syncing=false;if(pending&&session){clearTimeout(timer);timer=setTimeout(()=>push(true),failed?5000:250);}}}
+ async function push(){if(!session||syncing||suppress)return;syncing=true;try{const row=await getCloudRow();if(row){const remoteTime=Date.parse(row.updated_at)||0;if(remoteTime>lastRemoteAt+500){const remote=stripCloudFields(row.data||{});await restoreAssets(remote.assets,session.user.id,false);if(hasContent(remote.data))data=mergeData(data,remote.data);lastRemoteAt=remoteTime;}}
+     await saveCloud(clone(data));pending=false;suppress=true;localStorage.setItem(DATA_KEY,JSON.stringify(data));suppress=false;refreshViews();say('Синхронизировано · '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}));
+   }catch(e){console.error('Stardust cloud push',e);say('Ошибка синхронизации: '+(e.message||'проверь настройки Supabase Storage.'),true);}finally{syncing=false;}}
  async function pullIfChanged(){if(!session||syncing||suppress||pending)return;try{const row=await getCloudRow();if(!row)return;const stamp=Date.parse(row.updated_at)||0;if(stamp>lastRemoteAt+1000){syncing=true;await adoptCloudRow(row);say('Получены изменения с другого устройства.');syncing=false;}}catch(e){syncing=false;console.warn('Stardust cloud pull',e);}}
- function schedule(){if(!session||suppress)return;pending=true;changeVersion++;clearTimeout(timer);timer=setTimeout(()=>push(true),650);}
- function startRealtime(){
-  if(!session)return;
-  if(realtimeChannel){client.removeChannel(realtimeChannel);realtimeChannel=null;}
-  realtimeChannel=client.channel('stardust-sync-'+session.user.id)
-   .on('postgres_changes',{event:'*',schema:'public',table:TABLE,filter:'user_id=eq.'+session.user.id},()=>{if(!pending&&!syncing)pullIfChanged();})
-   .subscribe();
- }
+ function schedule(){if(!session||suppress)return;pending=true;clearTimeout(timer);timer=setTimeout(()=>push(),1800);}
  function setSignedIn(on,email=''){ $id('sdAuthFields').classList.toggle('hide',on);$id('sdSignedIn').classList.toggle('hide',!on);$id('sdAccountEmail').textContent=on?email:''; }
  async function withButton(button,fn){if(button.disabled)return;button.disabled=true;try{await fn()}finally{button.disabled=false;}}
  $id('sdRegister').onclick=()=>withButton($id('sdRegister'),async()=>{const email=$id('sdEmail').value.trim(),password=$id('sdPassword').value;if(!email||password.length<6)return say('Укажи почту и пароль не короче 6 символов.',true);const {data:result,error}=await client.auth.signUp({email,password,options:{emailRedirectTo:SITE_URL}});if(error)throw say(error.message,true);if(result.session){session=result.session;setSignedIn(true,email);await initialSync()}else say('Аккаунт создан. Подтверди адрес по ссылке в письме, затем вернись в Stardust и войди.');}).catch(e=>{if(e) say(e.message||String(e),true)});
  $id('sdLogin').onclick=()=>withButton($id('sdLogin'),async()=>{const email=$id('sdEmail').value.trim(),password=$id('sdPassword').value;if(!email||!password)return say('Введи почту и пароль.',true);const {data:result,error}=await client.auth.signInWithPassword({email,password});if(error)throw error;session=result.session;setSignedIn(true,result.user.email);await initialSync()}).catch(e=>say(e.message||String(e),true));
  $id('sdLogout').onclick=async()=>{await client.auth.signOut();session=null;setSignedIn(false);say('Ты вышла из аккаунта. Локальная копия данных осталась на этом устройстве.');};
  $id('sdReset').onclick=async()=>{const email=$id('sdEmail').value.trim();if(!email)return say('Сначала введи адрес электронной почты.',true);const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:SITE_URL});say(error?error.message:'Если аккаунт существует, письмо для восстановления отправлено.');};
- $id('sdSyncNow').onclick=()=>withButton($id('sdSyncNow'),async()=>{await push(false)});
- client.auth.onAuthStateChange((event,newSession)=>{session=newSession;if(newSession){setSignedIn(true,newSession.user.email);startRealtime();if(!authReady){authReady=true;setTimeout(()=>initialSync(),0)}else if(event==='SIGNED_IN')setTimeout(()=>initialSync(),0);}else{if(realtimeChannel){client.removeChannel(realtimeChannel);realtimeChannel=null;}setSignedIn(false);if(event==='SIGNED_OUT')say('Ты вышла из аккаунта. Локальные данные сохранены.');}});
- (async()=>{const {data:result,error}=await client.auth.getSession();if(error){say(error.message,true);return;}session=result.session;if(session){setSignedIn(true,session.user.email);startRealtime();authReady=true;await initialSync()}else{setSignedIn(false);say('Войди или создай аккаунт, чтобы включить облачную синхронизацию.');}})();
+ $id('sdSyncNow').onclick=()=>withButton($id('sdSyncNow'),async()=>{await push()});
+ client.auth.onAuthStateChange((event,newSession)=>{session=newSession;if(newSession){setSignedIn(true,newSession.user.email);if(!authReady){authReady=true;setTimeout(()=>initialSync(),0)}else if(event==='SIGNED_IN')setTimeout(()=>initialSync(),0);}else{setSignedIn(false);if(event==='SIGNED_OUT')say('Ты вышла из аккаунта. Локальные данные сохранены.');}});
+ (async()=>{const {data:result,error}=await client.auth.getSession();if(error){say(error.message,true);return;}session=result.session;if(session){setSignedIn(true,session.user.email);authReady=true;await initialSync()}else{setSignedIn(false);say('Войди или создай аккаунт, чтобы включить облачную синхронизацию.');}})();
  // Save hook for all ordinary app mutations, plus direct writes used by a few older controls.
  const nativeSet=Storage.prototype.setItem,nativeRemove=Storage.prototype.removeItem;const syncKeys=new Set([DATA_KEY,'stardust_last_music','stardust_stars_enabled','stardust_celestial_effect','stardust_focus_session']);Storage.prototype.setItem=function(k,v){nativeSet.call(this,k,v);if(syncKeys.has(k)&&!suppress)schedule();};Storage.prototype.removeItem=function(k){nativeRemove.call(this,k);if(syncKeys.has(k)&&!suppress)schedule();};
  // Music entries are stored in IndexedDB independently of the main JSON record. Re-rendering the library
@@ -994,8 +969,8 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
  const musicHost=$id('musicList');if(musicHost){const observer=new MutationObserver(()=>schedule());observer.observe(musicHost,{childList:true,subtree:false});}
  window.__stardustCloudSync={schedule,now:push};
  window.addEventListener('online',schedule);
- document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(session)schedule();else pullIfChanged();}});
- setInterval(pullIfChanged,5000);
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')pullIfChanged()});
+ setInterval(pullIfChanged,12000);
 })();
 </script>
 </body></html>
