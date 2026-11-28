@@ -157,7 +157,9 @@ textarea{resize:vertical}
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const key='stardust_data_v1';
-let data;try{data=JSON.parse(localStorage.getItem(key))||{tasks:{},words:[],focus:[],recentActivities:[],points:0,bonusDays:{}}}catch{data={tasks:{},words:[],focus:[],recentActivities:[],points:0,bonusDays:{}}}data.habits=data.habits||[];data.thoughts=data.thoughts||[];data.ideas=data.ideas||[];data.wishes=data.wishes||[];data.habitRewards=data.habitRewards||{};data.words=data.words||[];data.focus=data.focus||[];data.words.forEach(w=>{if(typeof w.learned!=='boolean')w.learned=false});
+const stardustDefaultData=()=>({tasks:{},words:[],focus:[],recentActivities:[],points:0,bonusDays:{},habits:[],thoughts:[],ideas:[],wishes:[],habitRewards:{}});
+let data;const stardustRaw=localStorage.getItem(key);try{data=stardustRaw?JSON.parse(stardustRaw):stardustDefaultData();if(!data||typeof data!=='object'||Array.isArray(data))throw new Error('Invalid data shape');}catch(e){try{if(stardustRaw)localStorage.setItem('stardust_corrupt_backup_'+Date.now(),stardustRaw);}catch(_){}data=stardustDefaultData();console.error('Stardust data parsing failed; raw payload backed up when possible.',e);}
+if(!data.tasks||typeof data.tasks!=='object'||Array.isArray(data.tasks))data.tasks={};['words','focus','recentActivities','habits','thoughts','ideas','wishes'].forEach(k=>{if(!Array.isArray(data[k]))data[k]=[]});if(!data.bonusDays||typeof data.bonusDays!=='object')data.bonusDays={};if(!data.habitRewards||typeof data.habitRewards!=='object')data.habitRewards={};data.words.forEach(w=>{if(w&&typeof w.learned!=='boolean')w.learned=false});
 const save=()=>{localStorage.setItem(key,JSON.stringify(data));window.__stardustCloudSync?.schedule();};
 const dateKey=d=>{let x=new Date(d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`};
 const today=dateKey(new Date());let selectedDay=today,calendarDate=new Date(),cardIndex=0,quiz=null;
