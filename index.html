@@ -276,8 +276,8 @@ $('#musicShuffle').onclick=async()=>{let arr=(await musicItems()).filter(x=>x.bl
 // Reliable thought save/edit handler
 $('#saveThought').onclick=async()=>{let text=$('#thoughtText').value.trim(),title=$('#thoughtTitle').value.trim();if(!text&&!title)return toast('Запись пуста.');let files=[];for(let f of [...$('#thoughtFiles').files]){try{let dataUrl=await new Promise((resolve,reject)=>{let r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(f)});files.push({name:f.name,type:f.type,data:dataUrl})}catch(e){}}let entry={id:thoughtEditId||('th'+Date.now()),title,text,tags:$('#thoughtTags').value.split(',').map(x=>x.trim()).filter(Boolean),collection:$('#thoughtCollection').value,created:thoughtEditId?(data.thoughts.find(t=>t.id===thoughtEditId)?.created||Date.now()):Date.now(),files};if(thoughtEditId){let i=data.thoughts.findIndex(t=>t.id===thoughtEditId);if(i>=0)data.thoughts[i]=entry;thoughtEditId=null}else{data.thoughts=data.thoughts||[];data.thoughts.unshift(entry)}save();$('#thoughtTitle').value='';$('#thoughtText').value='';$('#thoughtTags').value='';$('#thoughtFiles').value='';renderThoughts();renderGraph();toast('Запись сохранена.');};$('#clearThought').onclick=()=>{ $('#thoughtTitle').value='';$('#thoughtText').value='';$('#thoughtTags').value='';$('#thoughtFiles').value='';thoughtEditId=null;};
 
-/* Stardust startup render fix */
-try{renderHome();renderWords();renderFocusStats();renderHabits();renderWishes();renderThoughts();renderIdeas();}catch(e){console.error('Stardust startup render:',e)}
+/* Stardust startup render fix: isolate sections so one renderer cannot block others */
+for(const [name,fn] of [['home',renderHome],['words',renderWords],['focus',renderFocusStats],['habits',renderHabits],['wishes',renderWishes],['thoughts',renderThoughts],['ideas',renderIdeas]]){try{if(typeof fn==='function')fn()}catch(e){console.error('Stardust startup render failed: '+name,e)}}
 // Stardust Wellbeing: standalone Health page (mood, routines, library, emotional tools)
 (()=>{
  const page=document.querySelector('#health'); if(!page)return;
