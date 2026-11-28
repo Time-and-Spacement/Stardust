@@ -1098,29 +1098,68 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
 </script>
 
 <script>
-/* Stardust navigation rebuild: central delegated navigation, resilient to legacy handlers. */
+/* Stardust navigation: one delegated entry point and isolated page renderers. */
 (()=>{
  'use strict';
- const valid=new Set(['home','english','focus','habits','shop','thoughts','music','health','calendar','stats','projects','settings']);
+ const order=['home','english','focus','habits','shop','thoughts','music','health','calendar','stats','projects','settings'];
+ const valid=new Set(order);
  let current=document.querySelector('.page.active')?.id||'home';
+ const renderers={
+  home:()=>window.renderHome?.(),
+  english:()=>window.renderWords?.(),
+  focus:()=>window.renderFocusStats?.(),
+  habits:()=>window.renderHabits?.(),
+  shop:()=>window.renderWishes?.(),
+  thoughts:()=>window.renderThoughts?.(),
+  music:()=>{window.renderMusic?.();window.updateMusicCount?.();},
+  health:()=>window.renderHealth?.(),
+  calendar:()=>window.renderExtraCal?.(),
+  stats:()=>window.renderStats?.(),
+  projects:()=>window.renderProjects?.()
+ };
  function navigate(id){
-  if(!valid.has(id))return;
-  const target=document.getElementById(id);if(!target)return;
-  const order=[...valid],from=order.indexOf(current),to=order.indexOf(id);
+  if(!valid.has(id))return false;
+  const target=document.getElementById(id);if(!target)return false;
+  const activePage=document.querySelector('.page.active')?.id||current;
+  const from=order.indexOf(activePage),to=order.indexOf(id);
   current=id;
-  document.querySelectorAll('.page').forEach(p=>{p.classList.toggle('active',p.id===id);p.classList.remove('page-arrive-next','page-arrive-prev')});
+  document.querySelectorAll('.page').forEach(p=>{
+   p.classList.toggle('active',p.id===id);
+   p.classList.remove('page-arrive-next','page-arrive-prev');
+  });
   target.classList.add(to>=from?'page-arrive-next':'page-arrive-prev');
-  document.querySelectorAll('.navbtn[data-page]').forEach(b=>{const on=b.dataset.page===id;b.classList.toggle('active',on);b.setAttribute('aria-current',on?'page':'false')});
+  document.querySelectorAll('.navbtn[data-page]').forEach(b=>{
+   const on=b.dataset.page===id;
+   b.classList.toggle('active',on);
+   if(on)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');
+  });
   document.body.classList.toggle('thoughts-page-active',id==='thoughts');
   document.querySelector('.ideaDrawerPanel')?.classList.remove('ideaDrawerOpen');
   document.querySelector('.ideaDrawerToggle')?.classList.remove('drawerActive');
-  try{if(id==='focus')window.renderFocusStats?.();if(id==='habits')window.renderHabits?.();if(id==='shop')window.renderWishes?.();if(id==='calendar')window.renderExtraCal?.();if(id==='projects')window.renderProjects?.();if(id==='stats')window.renderStats?.();if(id==='music'){window.renderMusic?.();window.updateMusicCount?.();}if(id==='home')window.renderHome?.();}catch(e){console.error('Stardust navigation renderer:',e)}
-  const active=document.querySelector('.navbtn.active');active?.scrollIntoView?.({block:'nearest',inline:'nearest',behavior:'smooth'});
+  if(id==='english'){
+   if(typeof wordListCollapsed!=='undefined'&&typeof $==='function'){
+    wordListCollapsed=true;
+    $('#vocabPanel')?.classList.add('vocabCollapsed');
+    const toggle=$('#toggleWordList');
+    if(toggle){toggle.textContent='Развернуть список слов';toggle.setAttribute('aria-expanded','false');}
+   }
+  }
+  try{renderers[id]?.();}catch(e){console.error('Stardust page render failed: '+id,e);}
+  const active=document.querySelector('.navbtn.active');
+  active?.scrollIntoView?.({block:'nearest',inline:'nearest',behavior:'smooth'});
+  return true;
  }
- document.addEventListener('click',e=>{const b=e.target.closest('.navbtn[data-page]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();navigate(b.dataset.page)},true);
+ document.addEventListener('click',e=>{
+  const b=e.target.closest('.navbtn[data-page]');
+  if(!b)return;
+  e.preventDefault();e.stopImmediatePropagation();
+  navigate(b.dataset.page);
+ },true);
  window.stardustNavigate=navigate;
- // Ensure page visibility state is normalized on load without touching stored data.
- document.addEventListener('DOMContentLoaded',()=>{if(!document.querySelector('.page.active'))navigate(current)});
-})();
-</script>
+ document.addEventListener('DOMContentLoaded',()=>{
+  const active=document.querySelector('.page.active')?.id;
+  if(active&&valid.has(active))current=active;
+  else navigate(current);
+ });
+})();</script>
 </body></html>
