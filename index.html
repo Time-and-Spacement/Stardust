@@ -959,7 +959,7 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
    entries.push(job.kind==='thought'
     ?{kind:'thought',id:job.id,path,size,type}
     :{kind:'music',id:job.id,path,size,type,meta:cleanMusic(job.item)});
-  },()=>{done++;say('Загрузка файлов в облако: '+(completed+done)+' из '+jobs.length+' · прогресс сохранён');});
+  },()=>{done++;say('Загрузка файлов в облако: '+done+' из '+jobs.length+' · прогресс сохранён');});
   return entries;
  }
  async function restoreAssets(manifest,uid,reconcile=true){
@@ -1091,5 +1091,9 @@ async function renderLastMusic(){let h=$('#lastMusicHome'),m;try{m=JSON.parse(lo
 
 <script>
 (()=>{const nav=document.querySelectorAll('.navbtn[data-page="health"]');nav.forEach(b=>b.addEventListener('click',()=>setTimeout(()=>{document.querySelectorAll('#healthMoodChoices [data-emotion]').forEach(x=>x.classList.remove('primary'));},50)));})();
+</script>
+
+<script>
+(()=>{const st=document.getElementById('sdCloudStatus');if(!st)return;st.style.minHeight='54px';st.style.fontWeight='600';st.style.lineHeight='1.5';const old=st.textContent;const observer=new MutationObserver(()=>{const v=st.textContent||'';if(v.includes('Загрузка файлов в облако:')){st.style.color='var(--text)';st.title='Число загруженных/проверенных вложений в текущем проходе. Это не число всех вложений, ранее сохранённых в облаке.';}else if(v.includes('Синхронизировано')||v.includes('Синхронизация завершена')||v.includes('загружены в облако')){st.style.color='#80d6a5';st.title='Последний запрос сохранения данных успешно завершён.';}else if(v.includes('Ошибка')||v.includes('Не удалось')){st.style.color='#ff9eae';st.title='Синхронизация завершилась ошибкой; локальные данные остаются.'}});observer.observe(st,{childList:true,subtree:true,characterData:true});})();
 </script>
 </body></html>
